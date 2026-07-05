@@ -470,8 +470,8 @@ class SVGQualityChecker:
             )
             return
 
-        if values[0] != 0 or values[1] != 0 or any(not part.isdigit() for part in parts):
-            result['warnings'].append(f"Unusual viewBox format: {viewbox}")
+        if values[0] != 0 or values[1] != 0:
+            result['warnings'].append(f"Unusual viewBox format (non-zero origin): {viewbox}")
 
         # Check if it matches expected format
         if expected_format and expected_format in CANVAS_FORMATS:
@@ -593,7 +593,11 @@ class SVGQualityChecker:
                 "Detected alpha-channel HEX color (#RGBA/#RRGGBBAA is not exported "
                 "to PPTX — fills become invisible; use 6-digit HEX plus "
                 "fill-opacity/stroke-opacity)")
-        if any(_local_name(elem).lower() == 'g' and elem.get('opacity') for elem in elems):
+        if any(
+            _local_name(elem).lower() == 'g' and
+            elem.get('opacity') not in (None, '1', '1.0')
+            for elem in elems
+        ):
             result['errors'].append("Detected forbidden <g opacity> (set opacity on each child element individually)")
         if any(_local_name(elem).lower() == 'image' and elem.get('opacity') for elem in elems):
             result['errors'].append("Detected forbidden <image opacity> (use overlay mask approach)")
@@ -1306,6 +1310,7 @@ class SVGQualityChecker:
 
         if not dir_path.exists():
             print(f"[ERROR] Directory does not exist: {directory}")
+            self.summary['errors'] += 1
             return []
 
         # Brand-only template directories (templates/brands/<id>/) have no SVG
@@ -1339,7 +1344,8 @@ class SVGQualityChecker:
                 svg_files = sorted(svg_output.glob('*.svg'))
 
         if not svg_files:
-            print(f"[WARN] No SVG files found")
+            print(f"[ERROR] No SVG files found in: {directory}")
+            self.summary['errors'] += 1
             return []
 
         print(f"\n[SCAN] Checking {len(svg_files)} SVG file(s)...\n")
